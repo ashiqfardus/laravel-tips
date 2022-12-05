@@ -9,6 +9,8 @@
 - [Get Bearer Token from Authorization header](#get-bearer-token-from-authorization-header)
 - [Sorting Your API Results](#sorting-your-api-results)
 - [Customize Exception Handler For API](#customize-exception-handler-for-api)
+- [Force JSON Response For API Requests](#force-json-response-for-api-requests)
+- [API Versioning](#api-versioning)
 
 ### API Resources: With or Without "data"?
 
@@ -70,7 +72,7 @@ This will only append the department if it’s already loaded in the Employee mo
 Without `whenLoaded()` there is always a query for the department
 
 ```php
-class EmplyeeResource extends JsonResource
+class EmployeeResource extends JsonResource
 {
     public function toArray($request): array
     {
@@ -145,6 +147,7 @@ Route::get('dogs', function (Request $request) {
     return $query->paginate(20);
 });
 ```
+---
 
 ### Customize Exception Handler For API
 
@@ -208,3 +211,143 @@ There's a method `register()` in `App\Exceptions` class:
     }
 ```
 
+Tip given by [Feras Elsharif](https://github.com/ferasbbm)
+
+---
+
+### Force JSON Response For API Requests
+
+If you have built an API and it encounters an error when the request does not contain "Accept: application/JSON " HTTP Header then the error will be returned as HTML or redirect response on API routes, so for avoid it we can force all API responses to JSON.
+
+The first step is creating middleware by running this command:
+
+```console
+php artisan make:middleware ForceJsonResponse
+```
+
+Write this code on the handle function in `App/Http/Middleware/ForceJsonResponse.php` file:
+
+```php
+public function handle($request, Closure $next)
+{
+    $request->headers->set('Accept', 'application/json');
+    return $next($request);
+}
+```
+
+Second, register the created middleware in app/Http/Kernel.php file:
+
+```php
+protected $middlewareGroups = [        
+    'api' => [
+        \App\Http\Middleware\ForceJsonResponse::class,
+    ],
+];
+```
+
+Tip given by [Feras Elsharif](https://github.com/ferasbbm)
+
+---
+
+### API Versioning
+
+#### When to version?
+
+If you are working on a project that may have multi-release in the future or your endpoints have a breaking change like a change in the format of the response data, and you want to ensure that the API version remains functional when changes are made to the code.
+
+#### Change The Default Route Files 
+The first step is to change the route map in the `App\Providers\RouteServiceProvider` file, so let's get started:
+
+#### Laravel 8 and above:
+
+Add a 'ApiNamespace' property 
+
+```php
+/**
+ * @var string
+ *
+ */
+protected string $ApiNamespace = 'App\Http\Controllers\Api';
+```
+
+Inside the method boot, add the following code:
+
+```php
+$this->routes(function () {
+     Route::prefix('api/v1')
+        ->middleware('api')
+        ->namespace($this->ApiNamespace.'\\V1')
+        ->group(base_path('routes/API/v1.php'));
+        }
+    
+    //for v2
+     Route::prefix('api/v2')
+            ->middleware('api')
+            ->namespace($this->ApiNamespace.'\\V2')
+            ->group(base_path('routes/API/v2.php'));
+});
+```
+
+
+#### Laravel 7 and below:
+
+Add a 'ApiNamespace' property
+
+```php
+/**
+ * @var string
+ *
+ */
+protected string $ApiNamespace = 'App\Http\Controllers\Api';
+```
+
+Inside the method map, add the following code:
+
+```php
+// remove this $this->mapApiRoutes(); 
+    $this->mapApiV1Routes();
+    $this->mapApiV2Routes();
+```
+
+And add these methods:
+
+```php
+  protected function mapApiV1Routes()
+    {
+        Route::prefix('api/v1')
+            ->middleware('api')
+            ->namespace($this->ApiNamespace.'\\V1')
+            ->group(base_path('routes/Api/v1.php'));
+    }
+
+  protected function mapApiV2Routes()
+    {
+        Route::prefix('api/v2')
+            ->middleware('api')
+            ->namespace($this->ApiNamespace.'\\V2')
+            ->group(base_path('routes/Api/v2.php'));
+    }
+```
+
+#### Controller Folder Versioning
+
+```
+Controllers
+└── Api
+    ├── V1
+    │   └──AuthController.php
+    └── V2
+        └──AuthController.php
+```
+
+#### Route File Versioning
+
+```
+routes
+└── Api
+   │    └── v1.php     
+   │    └── v2.php 
+   └── web.php
+```
+
+Tip given by [Feras Elsharif](https://github.com/ferasbbm)
